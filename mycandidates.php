@@ -60,43 +60,49 @@ else
 $startFrom = ($currentPage * $showRecordPerPage) - $showRecordPerPage;
 
 
-$empSQL = "SELECT * FROM `universe_candidates` where first_name != '' and sourcedby='$user_id'";
+$conditions = " first_name != '' and sourcedby = ?";
+$queryParams = array($user_id);
+$queryTypes = "i";
 
 if (!empty($_GET['candidate_name'])) 
 {
-	$empSQL .= " AND (first_name  LIKE  '%" . $_GET['candidate_name'] . "%' or middle_name  LIKE  '%" . $_GET['candidate_name'] . "%' or last_name  LIKE  '%" . $_GET['candidate_name'] . "%')";
+	$likeCandidateName = '%' . $_GET['candidate_name'] . '%';
+	$conditions .= " AND (first_name LIKE ? OR middle_name LIKE ? OR last_name LIKE ?)";
+	$queryParams[] = $likeCandidateName;
+	$queryParams[] = $likeCandidateName;
+	$queryParams[] = $likeCandidateName;
+	$queryTypes .= "sss";
 }
 if (!empty($_GET['candidate_email'])) 
 {
-	$empSQL .= " AND email = '" . $_GET['candidate_email'] . "'";
+	$conditions .= " AND email = ?";
+	$queryParams[] = $_GET['candidate_email'];
+	$queryTypes .= "s";
 }
 if (!empty($_GET['candidate_phone'])) 
 {
-	$empSQL .= " AND contact_number1 = '" . $_GET['candidate_phone'] . "'";
+	$conditions .= " AND contact_number1 = ?";
+	$queryParams[] = $_GET['candidate_phone'];
+	$queryTypes .= "s";
 }
-$empSQL .= " order by candidate_id DESC LIMIT $startFrom, $showRecordPerPage";
-$canResult = mysqli_query($connection, $empSQL);
+
+$empSQL = "SELECT * FROM `universe_candidates` WHERE" . $conditions . " order by candidate_id DESC LIMIT ?, ?";
+$queryParamsWithPaging = $queryParams;
+$queryParamsWithPaging[] = $startFrom;
+$queryParamsWithPaging[] = $showRecordPerPage;
+$queryTypesWithPaging = $queryTypes . "ii";
+
+$stmt = mysqli_prepare($connection, $empSQL);
+mysqli_stmt_bind_param($stmt, $queryTypesWithPaging, ...$queryParamsWithPaging);
+mysqli_stmt_execute($stmt);
+$canResult = mysqli_stmt_get_result($stmt);
 $curresults = mysqli_num_rows($canResult);
 
-
-
-$empSQL1 = "SELECT count(*) as total FROM `universe_candidates` where first_name != '' and sourcedby='$user_id'";
-
-if (!empty($_GET['candidate_name'])) 
-{
-	$empSQL1 .= " AND (first_name  LIKE  '%" . $_GET['candidate_name'] . "%' or middle_name  LIKE  '%" . $_GET['candidate_name'] . "%' or last_name  LIKE  '%" . $_GET['candidate_name'] . "%')";
-}
-if (!empty($_GET['candidate_email'])) 
-{
-	$empSQL1 .= " AND email = '" . $_GET['candidate_email'] . "'";
-}
-if (!empty($_GET['candidate_phone'])) 
-{
-	$empSQL1 .= " AND contact_number1 = '" . $_GET['candidate_phone'] . "'";
-}
-$empSQL1 .= " order by candidate_id DESC";
-
-$canResult1 = mysqli_query($connection, $empSQL1);
+$empSQL1 = "SELECT count(*) as total FROM `universe_candidates` WHERE" . $conditions . " order by candidate_id DESC";
+$stmtCount = mysqli_prepare($connection, $empSQL1);
+mysqli_stmt_bind_param($stmtCount, $queryTypes, ...$queryParams);
+mysqli_stmt_execute($stmtCount);
+$canResult1 = mysqli_stmt_get_result($stmtCount);
 $candidatetotat = mysqli_fetch_assoc($canResult1);
 //echo $empSQL1;
 $totalresultts = $candidatetotat['total'];
